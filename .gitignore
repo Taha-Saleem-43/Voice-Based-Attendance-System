@@ -1,14 +1,44 @@
-secrets.toml
-.streamlit/secrets.toml
-*.db
-*.sqlite*
+# Python
 __pycache__/
-*.py[cod]
-.deploy-venv/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+.venv/
 venv/
-assets/
-Voices/
-common_voice_dataset/
+env/
+
+# Large model files (download separately)
 pretrained_models/
-*.log
+
+# Streamlit cache
+.streamlit/secrets.toml
+
+# Librosa cache
+.cache/
+
+# Database (back this up separately for production)
+database/*.db*
+assets/
+.deploy-venv/
 deploy-dist/
+.env
+.env.*
+!.env.example
+*.zip
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+*.log

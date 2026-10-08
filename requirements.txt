@@ -1,0 +1,16 @@
+# Python 3.11 or 3.12. CPU wheels avoid downloading CUDA libraries.
+--extra-index-url https://download.pytorch.org/whl/cpu
+streamlit==1.55.0
+pandas==2.2.3
+bcrypt==4.3.0
+plotly==6.0.1
+numpy==1.26.4
+soundfile==0.13.1
+librosa==0.11.0
+torch==2.5.1+cpu
+torchaudio==2.5.1+cpu
+speechbrain==1.0.3
+huggingface_hub==0.28.1
+psycopg[binary]==3.2.6
+tzdata==2025.2
+

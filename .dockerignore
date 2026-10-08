@@ -1,0 +1,14 @@
+venv
+.deploy-venv
+__pycache__
+**/__pycache__
+.cache
+.git
+.env*
+.streamlit/secrets.toml
+database/*.db*
+pretrained_models
+assets
+deploy-dist
+tests
+*.zip
