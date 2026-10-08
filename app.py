@@ -116,7 +116,8 @@ with workspace_tab:
                             result=auth.login(username,password)
                             if result['status']:
                                 st.session_state.user=result
-                                st.rerun()
+                                destinations={'chairman':'pages/chairman.py','teacher':'pages/teacher.py','faculty':'pages/Faculty.py','student':'pages/Student.py'}
+                                st.switch_page(destinations[result['role']])
                             else:
                                 st.error(result['message'])
             else:

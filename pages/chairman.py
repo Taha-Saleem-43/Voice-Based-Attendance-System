@@ -36,14 +36,7 @@ attendance = AttendanceHandler(db)
 enroll = EnrollmentHandler(db, actor_user_id=st.session_state.user["user_id"])
 
 
-try:
-    audio_proc, spk_model = load_models()
-    model_load_error = None
-except Exception:
-    import logging
-    logging.exception('Speaker model startup failed')
-    audio_proc, spk_model = None, None
-    model_load_error = 'Check the deployment logs and model download connection.'
+
 
 
 # ─── Tabs ────────────────────────────────────────────────────────────────────
@@ -373,54 +366,52 @@ with tab_manage:
 
     # ── Voice Embeddings ──────────────────────────────────────────────────────
     section("🎙 Add Voice Embeddings (Teacher / Faculty)")
-    if spk_model is None:
-        st.error(f"Speaker model failed to load: {model_load_error}")
+    role_option = st.selectbox("Select Role", ["teacher", "faculty"])
+    table_name = "teachers" if role_option == "teacher" else "faculty"
+    user_list = db.execute(
+        f"SELECT u.user_id, u.username, t.name FROM users u "
+        f"JOIN {table_name} t ON u.user_id=t.user_id WHERE u.role=?",
+        (role_option,), fetch=True
+    )
+    if not user_list:
+        st.warning(f"No {role_option}s found.")
     else:
-        role_option = st.selectbox("Select Role", ["teacher", "faculty"])
-        table_name = "teachers" if role_option == "teacher" else "faculty"
-        user_list = db.execute(
-            f"SELECT u.user_id, u.username, t.name FROM users u "
-            f"JOIN {table_name} t ON u.user_id=t.user_id WHERE u.role=?",
-            (role_option,), fetch=True
+        user_map = {f"{u['name']} ({escape(u['username'])})": u["user_id"] for u in user_list}
+        selected_user = st.selectbox("Select User", list(user_map.keys()))
+        audio_files = st.file_uploader(
+            "Upload voice samples (.wav)", type=["wav"],
+            accept_multiple_files=True
         )
-        if not user_list:
-            st.warning(f"No {role_option}s found.")
-        else:
-            user_map = {f"{u['name']} ({escape(u['username'])})": u["user_id"] for u in user_list}
-            selected_user = st.selectbox("Select User", list(user_map.keys()))
-            audio_files = st.file_uploader(
-                "Upload voice samples (.wav)", type=["wav"],
-                accept_multiple_files=True
-            )
-            if st.button("🎙  Add Embeddings", type="primary"):
-                if not audio_files:
-                    st.error("Upload at least one .wav file.")
-                else:
-                    user_id = user_map[selected_user]
-                    ok, err = 0, 0
-                    error_details = []
-                    prog = st.progress(0)
-                    for i, af in enumerate(audio_files):
-                        try:
-                            prog.progress((i + 1) / len(audio_files))
-                            audio_np = audio_proc.process_file(af)
-                            embedding = spk_model.generate_embedding(audio_np)
-                            result = attendance.add_voice_embedding(user_id, embedding, "enrollment")
-                            if result.get("status"):
-                                ok += 1
-                            else:
-                                err += 1
-                                error_details.append(f"{escape(af.name)}: {result.get('message', 'Unknown error')}")
-                        except Exception as e:
+        if st.button("🎙  Add Embeddings", type="primary"):
+            if not audio_files:
+                st.error("Upload at least one .wav file.")
+            else:
+                user_id = user_map[selected_user]
+                ok, err = 0, 0
+                error_details = []
+                prog = st.progress(0)
+                for i, af in enumerate(audio_files):
+                    try:
+                        prog.progress((i + 1) / len(audio_files))
+                        audio_proc, spk_model = load_models()
+                        audio_np = audio_proc.process_file(af)
+                        embedding = spk_model.generate_embedding(audio_np)
+                        result = attendance.add_voice_embedding(user_id, embedding, "enrollment")
+                        if result.get("status"):
+                            ok += 1
+                        else:
                             err += 1
-                            error_details.append(f"{escape(af.name)}: {str(e)[:80]}")
-                    prog.empty()
-                    if ok:
-                        st.success(f"✓ {ok} embedding(s) added for {selected_user}")
-                        st.balloons()
-                    if err:
-                        st.error(f"✗ {err} failed:")
-                        for d in error_details:
-                            st.caption(f"  • {d}")
+                            error_details.append(f"{escape(af.name)}: {result.get('message', 'Unknown error')}")
+                    except Exception as e:
+                        err += 1
+                        error_details.append(f"{escape(af.name)}: {str(e)[:80]}")
+                prog.empty()
+                if ok:
+                    st.success(f"✓ {ok} embedding(s) added for {selected_user}")
+                    st.balloons()
+                if err:
+                    st.error(f"✗ {err} failed:")
+                    for d in error_details:
+                        st.caption(f"  • {d}")
 
     logout_button("logout_manage")

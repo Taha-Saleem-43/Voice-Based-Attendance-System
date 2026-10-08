@@ -28,7 +28,7 @@ class AppTests(unittest.TestCase):
         self.url_patch = patch('backend.database.setting',return_value=None)
         self.url_patch.start()
         self.model_patch = patch('backend.resources.load_models',return_value=(object(),object()))
-        self.model_patch.start()
+        self.model_loader = self.model_patch.start()
 
     def tearDown(self):
         self.model_patch.stop()
@@ -42,9 +42,12 @@ class AppTests(unittest.TestCase):
         app.text_input[0].set_value('admin')
         app.text_input[1].set_value('Test-password-42')
         login=next(button for button in app.button if 'Login' in button.label)
-        login.click().run()
+        with patch('streamlit.switch_page') as switch:
+            login.click().run()
+        switch.assert_called_once_with('pages/chairman.py')
         self.assertEqual(len(app.exception),0)
         self.assertEqual(app.session_state.user['role'],'chairman')
+        self.model_loader.assert_not_called()
 
     def test_chairman_and_semester_form(self):
         app = AppTest.from_file(str(ROOT/'pages/chairman.py'),default_timeout=20)
@@ -68,6 +71,24 @@ class AppTests(unittest.TestCase):
                 app.session_state.user=self.auth.login(role,'Test-password-42')
                 app.run()
                 self.assertEqual(len(app.exception),0)
+                self.model_loader.assert_not_called()
+
+    def test_login_redirects_each_campus_role(self):
+        enroll=EnrollmentHandler(self.db)
+        enroll.enroll_faculty('faculty','Test-password-42','Faculty',1)
+        enroll.enroll_teacher('teacher','Test-password-42','Teacher',1,section_id=1)
+        enroll.enroll_student('student','Test-password-42','R1','Student',1,1,1)
+        for role in ('faculty','teacher','student'):
+            with self.subTest(role=role):
+                app=AppTest.from_file(str(ROOT/'app.py'),default_timeout=20).run()
+                app.text_input[0].set_value(role)
+                app.text_input[1].set_value('Test-password-42')
+                with patch('streamlit.switch_page') as switch:
+                    next(button for button in app.button if 'Login' in button.label).click().run()
+                self.assertEqual(len(app.exception),0)
+                filename={'faculty':'Faculty.py','teacher':'teacher.py','student':'Student.py'}[role]
+                switch.assert_called_once_with(f'pages/{filename}')
+                self.model_loader.assert_not_called()
 
     def test_student_cannot_open_chairman_page(self):
         EnrollmentHandler(self.db).enroll_student('student','Test-password-42','R1','Student',1,1,1)

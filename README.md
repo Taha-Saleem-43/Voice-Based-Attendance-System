@@ -16,7 +16,7 @@ Copy-Item .streamlit/secrets.toml.example .streamlit/secrets.toml
 
 Run from this folder. Database/model paths are absolute internally, independent of the working directory. A missing SQLite database is created automatically. The existing local database is preserved; an existing active chairman is never overwritten by bootstrap secrets. New passwords must be 10-72 UTF-8 bytes. Old local passwords are accepted until explicitly changed; do not ship the old database.
 
-Log in as chairman, add departments, sections, and semester numbers (1-8), create faculty/teachers, then enroll students through faculty. Add several independent WAV recordings per person (2-30 seconds each). First model loading can take time; public model downloads need internet access but no Hugging Face token.
+Successful login opens the matching role dashboard immediately. Log in as chairman, add departments, sections, and semester numbers (1-8), create faculty/teachers, then enroll students through faculty. Add several independent WAV recordings per person (2-30 seconds each). The voice model loads only when processing recordings or verifying attendance; opening a dashboard does not download or initialize the model. First model loading can take time; public model downloads need internet access but no Hugging Face token.
 
 ## Free cloud deployment
 

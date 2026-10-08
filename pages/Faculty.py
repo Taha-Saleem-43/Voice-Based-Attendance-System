@@ -35,14 +35,7 @@ enroll = EnrollmentHandler(db, actor_user_id=st.session_state.user["user_id"])
 user_id = st.session_state.user["user_id"]
 
 
-try:
-    audio_proc, spk_model = load_models()
-    model_load_error = None
-except Exception:
-    import logging
-    logging.exception('Speaker model startup failed')
-    audio_proc, spk_model = None, None
-    model_load_error = 'Check the deployment logs and model download connection.'
+
 
 
 # ─── My Attendance ─────────────────────────────────────────────────────────
@@ -112,75 +105,73 @@ with st.form("add_student"):
 # ─── Voice Embeddings ─────────────────────────────────────────────────────
 section("🎙 Add Voice Embeddings for Students")
 
-if spk_model is None:
-    st.error(f"Speaker model failed to load: {model_load_error}")
+students = db.execute(
+    "SELECT s.user_id, s.name, u.username FROM students s "
+    "JOIN users u ON s.user_id=u.user_id WHERE s.dept_id=?",
+    (faculty_info["dept_id"],), fetch=True
+)
+
+if not students:
+    st.info("No students found in your department yet. Enroll students first.")
 else:
-    students = db.execute(
-        "SELECT s.user_id, s.name, u.username FROM students s "
-        "JOIN users u ON s.user_id=u.user_id WHERE s.dept_id=?",
-        (faculty_info["dept_id"],), fetch=True
-    )
+    student_map = {f"{s['name']} ({s['username']})": s["user_id"] for s in students}
+    c1, c2 = st.columns([1, 2])
+    with c1:
+        selected_student = st.selectbox("Select Student", list(student_map.keys()))
+    with c2:
+        audio_files = st.file_uploader(
+            "Upload voice samples (.wav)", type=["wav"],
+            accept_multiple_files=True
+        )
 
-    if not students:
-        st.info("No students found in your department yet. Enroll students first.")
-    else:
-        student_map = {f"{s['name']} ({s['username']})": s["user_id"] for s in students}
-        c1, c2 = st.columns([1, 2])
-        with c1:
-            selected_student = st.selectbox("Select Student", list(student_map.keys()))
-        with c2:
-            audio_files = st.file_uploader(
-                "Upload voice samples (.wav)", type=["wav"],
-                accept_multiple_files=True
-            )
+    st.markdown("""
+    <p style="color:#91A2BB;font-size:0.82rem;margin-bottom:1rem;">
+    Upload 3–5 voice samples per student for best accuracy. Files must be WAV format, 
+    at least 2 seconds long.
+    </p>
+    """, unsafe_allow_html=True)
 
-        st.markdown("""
-        <p style="color:#91A2BB;font-size:0.82rem;margin-bottom:1rem;">
-        Upload 3–5 voice samples per student for best accuracy. Files must be WAV format, 
-        at least 2 seconds long.
-        </p>
-        """, unsafe_allow_html=True)
+    if st.button("🎙  Process & Save Embeddings", type="primary"):
+        if not audio_files:
+            st.error("Please upload at least one .wav file.")
+        elif not selected_student:
+            st.error("Please select a student.")
+        else:
+            student_id = student_map[selected_student]
+            ok, err = 0, 0
+            error_details = []
+            prog = st.progress(0)
+            status_text = st.empty()
 
-        if st.button("🎙  Process & Save Embeddings", type="primary"):
-            if not audio_files:
-                st.error("Please upload at least one .wav file.")
-            elif not selected_student:
-                st.error("Please select a student.")
-            else:
-                student_id = student_map[selected_student]
-                ok, err = 0, 0
-                error_details = []
-                prog = st.progress(0)
-                status_text = st.empty()
-
-                for i, af in enumerate(audio_files):
-                    status_text.markdown(
-                        f"<small style='color:#91A2BB'>Processing {escape(af.name)}...</small>",
-                        unsafe_allow_html=True
-                    )
-                    prog.progress((i + 1) / len(audio_files))
-                    try:
-                        audio_np = audio_proc.process_file(af)
-                        embedding = spk_model.generate_embedding(audio_np)
-                        res = attendance.add_voice_embedding(student_id, embedding, "enrollment")
-                        if res.get("status"):
-                            ok += 1
-                        else:
-                            err += 1
-                            error_details.append(f"{escape(af.name)}: {res.get('message', 'Unknown error')}")
-                    except Exception as e:
+            for i, af in enumerate(audio_files):
+                status_text.markdown(
+                    f"<small style='color:#91A2BB'>Processing {escape(af.name)}...</small>",
+                    unsafe_allow_html=True
+                )
+                prog.progress((i + 1) / len(audio_files))
+                try:
+                    audio_proc, spk_model = load_models()
+                    audio_np = audio_proc.process_file(af)
+                    embedding = spk_model.generate_embedding(audio_np)
+                    res = attendance.add_voice_embedding(student_id, embedding, "enrollment")
+                    if res.get("status"):
+                        ok += 1
+                    else:
                         err += 1
-                        error_details.append(f"{escape(af.name)}: {str(e)[:80]}")
+                        error_details.append(f"{escape(af.name)}: {res.get('message', 'Unknown error')}")
+                except Exception as e:
+                    err += 1
+                    error_details.append(f"{escape(af.name)}: {str(e)[:80]}")
 
-                prog.empty()
-                status_text.empty()
+            prog.empty()
+            status_text.empty()
 
-                if ok:
-                    st.success(f"✓ {ok} embedding(s) successfully saved for {selected_student}")
-                    st.balloons()
-                if err:
-                    st.error(f"✗ {err} file(s) failed:")
-                    for d in error_details:
-                        st.caption(f"  • {d}")
+            if ok:
+                st.success(f"✓ {ok} embedding(s) successfully saved for {selected_student}")
+                st.balloons()
+            if err:
+                st.error(f"✗ {err} file(s) failed:")
+                for d in error_details:
+                    st.caption(f"  • {d}")
 
 logout_button("logout_faculty")
