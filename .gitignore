@@ -1,0 +1,14 @@
+secrets.toml
+.streamlit/secrets.toml
+*.db
+*.sqlite*
+__pycache__/
+*.py[cod]
+.deploy-venv/
+venv/
+assets/
+Voices/
+common_voice_dataset/
+pretrained_models/
+*.log
+deploy-dist/
