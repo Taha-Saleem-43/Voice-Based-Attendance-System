@@ -50,6 +50,8 @@ The database adapter supports SQLite and PostgreSQL with foreign keys, atomic en
 
 ## Verification
 
+Reference lists (departments, sections, semesters) use a bounded in-memory cache with a 60-second TTL. Chairman additions invalidate the affected list immediately. Cache keys isolate each database. Theme CSS is cached until its file modification time changes. Voice models use one shared resource cache. Account status, authorization, voice-profile activity, attendance reads, and attendance writes remain uncached so security and daily check-in decisions use current records. Cache contents are cleared when the app process restarts; free-host cold starts still take time.
+
 ```powershell
 .\.deploy-venv\Scripts\python -m unittest discover -s tests -v
 .\.deploy-venv\Scripts\python scripts/smoke_model.py

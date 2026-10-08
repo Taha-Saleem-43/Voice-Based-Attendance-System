@@ -15,6 +15,7 @@ from backend.enrollment_handler import EnrollmentHandler
 from backend.resources import load_models
 from html import escape
 from backend.reference_ui import reference_select
+from backend.reference_cache import reference_rows, invalidate_references
 
 st.set_page_config(
     page_title="Chairman · VBAS",
@@ -140,7 +141,7 @@ with tab_view:
     # ── Faculty Info ─────────────────────────────────────────────────────────
     section("🧑‍🔬 Faculty Members")
     try:
-        departments = db.execute("SELECT dept_id, dept_name FROM departments ORDER BY dept_name", fetch=True)
+        departments = reference_rows(db,'departments')
         dept_options = ["All Departments"] + [d["dept_name"] for d in departments]
         dept_map = {"All Departments": None}
         for d in departments:
@@ -171,7 +172,7 @@ with tab_view:
     # ── Teacher Info ─────────────────────────────────────────────────────────
     section("👨‍🏫 Teachers")
     try:
-        departments = db.execute("SELECT dept_id, dept_name FROM departments ORDER BY dept_name", fetch=True)
+        departments = reference_rows(db,'departments')
         dept_options2 = ["All Departments"] + [d["dept_name"] for d in departments]
         dept_map2 = {"All Departments": None}
         for d in departments:
@@ -203,8 +204,8 @@ with tab_view:
     # ── Student Info ─────────────────────────────────────────────────────────
     section("🎓 Students")
     try:
-        departments = db.execute("SELECT dept_id, dept_name FROM departments ORDER BY dept_name", fetch=True)
-        sections_list = db.execute("SELECT section_id, section_name FROM sections ORDER BY section_name", fetch=True)
+        departments = reference_rows(db,'departments')
+        sections_list = reference_rows(db,'sections')
         dept_options3 = ["All Departments"] + [d["dept_name"] for d in departments]
         section_options3 = ["All Sections"] + [s["section_name"] for s in sections_list]
         dept_map3 = {"All Departments": None}
@@ -258,6 +259,7 @@ with tab_manage:
             if dept_name.strip():
                 try:
                     db.execute("INSERT INTO departments (dept_name) VALUES (?)", (dept_name,))
+                    invalidate_references(db,'departments')
                     st.rerun()
                 except Exception as e:
                     st.error(str(e))
@@ -271,6 +273,7 @@ with tab_manage:
             if section_name.strip():
                 try:
                     db.execute("INSERT INTO sections (section_name) VALUES (?)", (section_name,))
+                    invalidate_references(db,'sections')
                     st.rerun()
                 except Exception as e:
                     st.error(str(e))
@@ -284,6 +287,7 @@ with tab_manage:
             if semester_no:
                 try:
                     db.execute("INSERT INTO semesters (semester_no) VALUES (?)", (int(semester_no),))
+                    invalidate_references(db,'semesters')
                     st.rerun()
                 except Exception as e:
                     st.error(str(e))

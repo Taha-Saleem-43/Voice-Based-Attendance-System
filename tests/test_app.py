@@ -11,6 +11,7 @@ sys.path.insert(0,str(ROOT))
 from backend.database import DatabaseHandler
 from backend.auth_handler import AuthHandler
 from backend.enrollment_handler import EnrollmentHandler
+from backend.reference_cache import reference_rows
 
 class AppTests(unittest.TestCase):
     def setUp(self):
@@ -50,6 +51,7 @@ class AppTests(unittest.TestCase):
         self.model_loader.assert_not_called()
 
     def test_chairman_and_semester_form(self):
+        reference_rows(self.db,'semesters')
         app = AppTest.from_file(str(ROOT/'pages/chairman.py'),default_timeout=20)
         app.session_state.user=self.admin
         app.run()
@@ -59,6 +61,7 @@ class AppTests(unittest.TestCase):
         next(button for button in app.button if 'Add Semester' in button.label).click().run()
         self.assertEqual(len(app.exception),0)
         self.assertIsNotNone(self.db.execute('SELECT 1 FROM semesters WHERE semester_no=2',fetchone=True))
+        self.assertTrue(any(row['semester_no']==2 for row in reference_rows(self.db,'semesters')))
 
     def test_all_role_pages(self):
         enroll=EnrollmentHandler(self.db)

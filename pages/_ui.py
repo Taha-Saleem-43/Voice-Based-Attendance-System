@@ -1,11 +1,17 @@
 """Shared campus product design and role access guards."""
 from pathlib import Path
 from html import escape
+from functools import lru_cache
 import streamlit as st
 from backend.config import ROOT, setting
 
+@lru_cache(maxsize=4)
+def _theme_css(path,modified_ns):
+    return Path(path).read_text(encoding='utf-8')
+
 def inject_css():
-    st.markdown('<style>'+(ROOT/'static/theme.css').read_text(encoding='utf-8')+'</style>',unsafe_allow_html=True)
+    path=ROOT/'static/theme.css'
+    st.markdown('<style>'+_theme_css(str(path),path.stat().st_mtime_ns)+'</style>',unsafe_allow_html=True)
 
 def brandbar(label='University attendance platform'):
     university=escape(str(setting('UNIVERSITY_NAME','Campus Intelligence')))
