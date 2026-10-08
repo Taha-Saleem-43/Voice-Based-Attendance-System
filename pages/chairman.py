@@ -14,8 +14,8 @@ from backend.attendance_handler import AttendanceHandler
 from backend.enrollment_handler import EnrollmentHandler
 from backend.resources import load_models
 from html import escape
-from backend.reference_ui import reference_select
-from backend.reference_cache import reference_rows, invalidate_references
+from backend.reference_ui import reference_select, reference_form
+from backend.reference_cache import reference_rows
 
 st.set_page_config(
     page_title="Chairman · VBAS",
@@ -251,50 +251,14 @@ with tab_manage:
 
     # ── Reference Data ────────────────────────────────────────────────────────
     section("🏢 Add Reference Data")
+    st.caption('Records save only when you submit a form. Submitting the same record twice will not create a duplicate.')
     c1, c2, c3 = st.columns(3)
     with c1:
-        st.markdown("<small style='color:#91A2BB;font-family:IBM Plex Mono,monospace;letter-spacing:.08em;'>DEPARTMENT</small>", unsafe_allow_html=True)
-        dept_name = st.text_input("Department Name", label_visibility="collapsed", placeholder="e.g. Computer Science")
-        if st.button("➕ Add Dept"):
-            if dept_name.strip():
-                try:
-                    db.execute("INSERT INTO departments (dept_name) VALUES (?)", (dept_name,))
-                    invalidate_references(db,'departments')
-                    st.rerun()
-                except Exception as e:
-                    st.error(str(e))
-            else:
-                st.error("Enter a department name")
-
+        reference_form(db,'departments','Department','➕ Add Dept')
     with c2:
-        st.markdown("<small style='color:#91A2BB;font-family:IBM Plex Mono,monospace;letter-spacing:.08em;'>SECTION</small>", unsafe_allow_html=True)
-        section_name = st.text_input("Section Name", label_visibility="collapsed", placeholder="e.g. A, B, C")
-        if st.button("➕ Add Section"):
-            if section_name.strip():
-                try:
-                    db.execute("INSERT INTO sections (section_name) VALUES (?)", (section_name,))
-                    invalidate_references(db,'sections')
-                    st.rerun()
-                except Exception as e:
-                    st.error(str(e))
-            else:
-                st.error("Enter a section name")
-
+        reference_form(db,'sections','Section','➕ Add Section')
     with c3:
-        st.markdown("<small style='color:#91A2BB;font-family:IBM Plex Mono,monospace;letter-spacing:.08em;'>SEMESTER</small>", unsafe_allow_html=True)
-        semester_no = st.number_input("Semester Number", min_value=1, max_value=8, step=1)
-        if st.button("➕ Add Semester"):
-            if semester_no:
-                try:
-                    db.execute("INSERT INTO semesters (semester_no) VALUES (?)", (int(semester_no),))
-                    invalidate_references(db,'semesters')
-                    st.rerun()
-                except Exception as e:
-                    st.error(str(e))
-            else:
-                st.error("Choose a semester number")
-
-
+        reference_form(db,'semesters','Semester','➕ Add Semester')
 
     # ── User Activation ──────────────────────────────────────────────────────
     section("🔒 Activate / Suspend Users")

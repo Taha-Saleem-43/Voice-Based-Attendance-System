@@ -62,6 +62,11 @@ class AppTests(unittest.TestCase):
         self.assertEqual(len(app.exception),0)
         self.assertIsNotNone(self.db.execute('SELECT 1 FROM semesters WHERE semester_no=2',fetchone=True))
         self.assertTrue(any(row['semester_no']==2 for row in reference_rows(self.db,'semesters')))
+        self.assertTrue(any('added successfully' in item.value for item in app.success))
+        next(widget for widget in app.number_input if widget.label=='Semester Number').set_value(2)
+        next(button for button in app.button if 'Add Semester' in button.label).click().run()
+        self.assertEqual(len(app.exception),0)
+        self.assertTrue(any('already exists' in item.value for item in app.info))
 
     def test_all_role_pages(self):
         enroll=EnrollmentHandler(self.db)

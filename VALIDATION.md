@@ -21,3 +21,5 @@ The redesigned homepage was visually checked at desktop size and a 390px mobile 
 The app remains a supervised demo. Anti-spoof/liveness detection and independent accuracy/threshold evaluation are not implemented by this deployment work. No fine-tuning was performed. Source publication and database provisioning do not constitute a running hosted deployment.
 
 Reference cache checks passed: repeated reads execute one query, cached results return independent copies, separate databases cannot share results, and invalidation exposes new records immediately. The chairman form test verifies invalidation after adding a semester. No measured cloud speedup is claimed.
+
+Reference-form update verification: the expanded 37-test suite passed 36 checks and encountered one 20-second faculty page startup timeout. All seven page tests passed on rerun (22.81 seconds total), including the chairman success/duplicate notices and immediate cache invalidation. New backend tests passed for simultaneous department submissions (one row only), repeated semester submission, invalid inputs, and rejection of non-chairman writes.
