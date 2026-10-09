@@ -2,6 +2,8 @@
 
 Streamlit attendance demo using frozen SpeechBrain ECAPA-TDNN embeddings. No fine-tuning is performed. Attendance uses cosine similarity against averaged enrollment embeddings; similarity is not a probability.
 
+**University rollout:** read `READINESS.md` before collecting institution-wide data. This release supports a supervised pilot with bounded records, database connections and voice queues. Production check-in verifies an entered campus username against that account's samples; it does not search the entire campus voice gallery. Attendance remains once per calendar day, not per course or class session.
+
 ## Local run
 
 Use Python 3.11 or 3.12 on Windows or Linux x86-64. The old bundled `venv` is not portable; create a new environment.
@@ -45,6 +47,7 @@ Environment variables override `.streamlit/secrets.toml` and Streamlit Cloud sec
 | DATABASE_URL | PostgreSQL connection URL; omit for local SQLite |
 | ATTENDANCE_TIMEZONE | Defaults to Asia/Karachi |
 | SPEAKER_VERIFICATION_THRESHOLD | Defaults to 0.5962; calibrate on independent recordings |
+| DB_POOL_SIZE | PostgreSQL connections per app process, defaults to 4; budget across all replicas |
 
 The database adapter supports SQLite and PostgreSQL with foreign keys, atomic enrollment, uniqueness of daily attendance, and account rechecks. Existing local schema is retained; startup adds missing tables/indexes. Back up the original database before any separate migration. Use an empty cloud database for a clean deployment.
 
@@ -57,6 +60,8 @@ Shared presentation lives in `ui/`, domain operations in `backend/`, and role en
 Chairman reference creation uses separate submit forms. Typing does not insert rows. A successful submit saves to the database, clears the form, refreshes the reference cache, and displays confirmation. Repeated or concurrent identical submissions use database uniqueness plus `ON CONFLICT DO NOTHING`, producing an already-exists notice rather than another row or a raw SQL error. Names have surrounding/repeated whitespace normalized; semester values remain restricted to 1–8. Reference creation rechecks active chairman authorization on the server.
 
 Reference lists (departments, sections, semesters) use a bounded in-memory cache with a 60-second TTL. Chairman additions invalidate the affected list immediately. Cache keys isolate each database. Theme CSS is cached until its file modification time changes. Voice models use one shared resource cache. Account status, authorization, voice-profile activity, attendance reads, and attendance writes remain uncached so security and daily check-in decisions use current records. Cache contents are cleared when the app process restarts; free-host cold starts still take time.
+
+Attendance and directories use server-filtered keyset pagination. A page shows at most 100 rows and exports only those rows. Date filters default to the latest 30 days; personal attendance totals cover all dates. Voice account selection searches server-side and requires a narrower search when results exceed 100. PostgreSQL uses a bounded process-wide connection pool with statement/lock timeouts. Administrative mutations store audit metadata without credential or biometric payloads.
 
 ```powershell
 .\.deploy-venv\Scripts\python -m unittest discover -s tests -v

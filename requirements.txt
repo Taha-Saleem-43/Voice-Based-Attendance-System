@@ -12,5 +12,6 @@ torchaudio==2.5.1+cpu
 speechbrain==1.0.3
 huggingface_hub==0.28.1
 psycopg[binary]==3.2.6
+psycopg-pool==3.2.6
 tzdata==2025.2
 

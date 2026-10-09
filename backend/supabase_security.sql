@@ -10,7 +10,8 @@ ALTER TABLE public.faculty ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.voice_embeddings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.attendance ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.login_attempts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.audit_events ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE public.departments, public.semesters, public.sections,
  public.users, public.students, public.teachers, public.faculty,
- public.voice_embeddings, public.attendance, public.login_attempts
+ public.voice_embeddings, public.attendance, public.login_attempts, public.audit_events
  FROM anon, authenticated;

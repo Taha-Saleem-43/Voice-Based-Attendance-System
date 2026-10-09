@@ -13,6 +13,7 @@ from backend.config import local_now,setting
 from backend.checkin import VoiceCheckinService
 from ui.layout import inject_css,brandbar,footer
 from backend.errors import ValidationError,report_error
+from backend.records import attendance_summary
 
 def safe_login(auth,username,password):
     try:
@@ -79,16 +80,18 @@ with checkin_tab:
             else:
                 st.markdown('<div class="pulse-ring"><span class="pulse-dot"></span> STATION READY</div>',unsafe_allow_html=True)
                 st.caption('Record 3–8 seconds of clear speech. Keep your microphone close.')
+                claimed_username=st.text_input('Campus username for check-in',max_chars=100,placeholder='Enter the enrolled person’s username',key='voice_claim')
+                st.caption('Voice verification checks this account only. Staff must confirm the person and username.')
                 audio=st.audio_input('Record your voice',sample_rate=16000,key=f"voice_{st.session_state.get('voice_revision',0)}")
                 verify,clear=st.columns([2,1])
-                if verify.button('Verify & Mark Attendance',type='primary',use_container_width=True,disabled=audio is None):
+                if verify.button('Verify & Mark Attendance',type='primary',use_container_width=True,disabled=audio is None or not claimed_username.strip()):
                     try:
                         if time.monotonic()-st.session_state.get('last_voice_attempt',0)<3:
                             raise ValidationError('Wait a few seconds before another attempt.')
                         st.session_state.last_voice_attempt=time.monotonic()
                         with st.spinner('Matching your voice securely...'):
                             processor,model=load_models()
-                            result=VoiceCheckinService(db,processor,model).identify(audio,supervisor_id=user['user_id'] if is_staff else None,kiosk_authorized=bool(st.session_state.get('kiosk_unlocked')))
+                            result=VoiceCheckinService(db,processor,model).identify(audio,supervisor_id=user['user_id'] if is_staff else None,kiosk_authorized=bool(st.session_state.get('kiosk_unlocked')),claimed_username=claimed_username)
                         if result['status']:
                             st.success(f"Attendance recorded for {result['username']}.")
                             st.caption(f"{local_now().strftime('%d %b %Y · %I:%M %p')} · Similarity {result['similarity']:.3f}")
@@ -134,14 +137,14 @@ with workspace_tab:
                 user=st.session_state.user
                 st.markdown(f'<div class="eyebrow">Your campus workspace</div><div class="section-title">Welcome, {escape(user["username"])}.</div><div class="section-sub">A focused space for your day on campus.</div><span class="role-badge">{escape(user["role"])}</span>',unsafe_allow_html=True)
                 try:
-                    records=attendance.get_user_attendance(user['user_id'])
+                    summary=attendance_summary(db,user['user_id'])
                 except Exception as exc:
                     st.error(report_error('hub-history',exc))
                     st.stop()
                 if user['role']!='chairman':
                     a,b=st.columns(2)
-                    a.metric('Recorded days',len(records))
-                    b.metric('Latest check-in',str(records[0]['date']) if records else 'Not yet')
+                    a.metric('Recorded days',summary['total'])
+                    b.metric('Latest check-in',summary['latest'] or 'Not yet')
                 destinations={'chairman':'pages/chairman.py','teacher':'pages/teacher.py','faculty':'pages/Faculty.py','student':'pages/Student.py'}
                 st.markdown('')
                 if st.button('Open my workspace →',type='primary',key='open_dashboard',use_container_width=True):

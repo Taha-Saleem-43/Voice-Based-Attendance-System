@@ -11,6 +11,20 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: vbas_test
+          POSTGRES_USER: vbas_test
+          POSTGRES_PASSWORD: fixture-only-ci-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U vbas_test -d vbas_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,10 +39,16 @@ jobs:
       - name: Parse Python sources
         run: python -m compileall -q app.py backend ui pages scripts tests
       - name: Run regression suite
+        env:
+          TEST_POSTGRES_URL: postgresql://vbas_test:fixture-only-ci-password@127.0.0.1:5432/vbas_test
         run: python -m unittest discover -s tests -v
       - name: Build source-only deployment archive
         run: python scripts/package_deployment.py
+      - name: Check synthetic concurrent database workload
+        run: python scripts/load_test.py --students 1000 --days 5 --workers 8 --requests 80 --output load-test-result.json
       - uses: actions/upload-artifact@v4
         with:
           name: deployment-source
-          path: deploy-dist/VBAS-deploy.zip
+          path: |
+            deploy-dist/VBAS-deploy.zip
+            load-test-result.json

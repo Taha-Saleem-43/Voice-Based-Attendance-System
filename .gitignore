@@ -42,3 +42,8 @@ Thumbs.db
 *.swp
 
 *.log
+.preview-*/
+seed_preview_fixture.py
+load-test-result.json
+*-preview.jpg
+deployed-workspace.jpg

@@ -5,7 +5,7 @@ from zipfile import ZipFile, ZIP_DEFLATED
 ROOT = Path(__file__).resolve().parent.parent
 
 def package():
-    files = [ROOT / name for name in ('app.py','requirements.txt','packages.txt','README.md','VALIDATION.md','CONTRIBUTING.md','Dockerfile','.dockerignore','.gitignore')]
+    files = [ROOT / name for name in ('app.py','requirements.txt','packages.txt','README.md','VALIDATION.md','READINESS.md','CONTRIBUTING.md','Dockerfile','.dockerignore','.gitignore')]
     files += list((ROOT/'backend').glob('*.py')) + list((ROOT/'backend').glob('*.sql'))
     files += list((ROOT/'pages').glob('*.py'))
     files += list((ROOT/'ui').glob('*.py'))

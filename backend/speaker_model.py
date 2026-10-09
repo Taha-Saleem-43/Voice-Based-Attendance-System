@@ -1,4 +1,5 @@
 import threading
+from backend.inference_capacity import InferenceCapacity
 import torch
 import numpy as np
 from pathlib import Path
@@ -11,7 +12,7 @@ class SpeakerModel:
     def __init__(self, device='cpu'):
         torch.set_num_threads(max(1, int(setting('TORCH_NUM_THREADS', '2'))))
         self.device = 'cuda' if device == 'cuda' and torch.cuda.is_available() else 'cpu'
-        self._lock = threading.Lock()
+        self._capacity = InferenceCapacity()
         # A failed download can leave an empty folder: test actual required files.
         required = ('hyperparams.yaml', 'embedding_model.ckpt', 'classifier.ckpt', 'mean_var_norm_emb.ckpt')
         complete = all((Path(MODEL_PATH) / name).is_file() for name in required)
@@ -44,19 +45,9 @@ class SpeakerModel:
         if len(audio_numpy) < AUDIO_MIN_LENGTH:
             raise ValueError("Audio too short. Speak at least 2 seconds.")
 
-        # Convert to tensor
-        audio_tensor = torch.tensor(
-            audio_numpy,
-            dtype=torch.float32
-        ).unsqueeze(0)
-
-        # Move to device
-        audio_tensor = audio_tensor.to(self.device)
-
-        # SpeechBrain requires relative length tensor
-        length_tensor = torch.tensor([1.0]).to(self.device)
-
-        with self._lock, torch.inference_mode():
+        with self._capacity.acquire(), torch.inference_mode():
+            audio_tensor = torch.tensor(audio_numpy,dtype=torch.float32).unsqueeze(0).to(self.device)
+            length_tensor = torch.tensor([1.0]).to(self.device)
             embedding = self.model.encode_batch(
                 audio_tensor,
                 wav_lens=length_tensor

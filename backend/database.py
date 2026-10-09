@@ -34,6 +34,16 @@ class DatabaseHandler:
 
     @contextmanager
     def transaction(self):
+        if self.postgres:
+            from backend.connection_pool import postgres_pool
+            from psycopg_pool import PoolTimeout, TooManyRequests
+            from backend.errors import ValidationError
+            try:
+                with postgres_pool(self.url).connection() as raw:
+                    yield Connection(raw, True)
+            except (PoolTimeout, TooManyRequests):
+                raise ValidationError('The database is busy. Wait a moment and try again.') from None
+            return
         raw = self._connect()
         try:
             yield Connection(raw, self.postgres)

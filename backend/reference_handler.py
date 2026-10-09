@@ -1,6 +1,7 @@
 from backend.errors import ValidationError, report_error
 """Atomic, duplicate-safe academic reference creation."""
 from backend.reference_cache import REFERENCE_COLUMNS,invalidate_references
+from backend.audit import audit_event
 
 def add_reference(db,actor_id,table,value):
     if table not in REFERENCE_COLUMNS:
@@ -18,5 +19,6 @@ def add_reference(db,actor_id,table,value):
         if not actor:
             raise ValidationError('An active chairman account is required.')
         row=conn.execute(f'INSERT INTO {table} ({name_column}) VALUES (?) ON CONFLICT ({name_column}) DO NOTHING RETURNING {id_column}',(value,)).fetchone()
+        if row: audit_event(conn,actor_id,f'{table}-created',row[id_column])
     invalidate_references(db,table)
     return bool(row)

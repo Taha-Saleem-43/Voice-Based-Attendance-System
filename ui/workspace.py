@@ -1,6 +1,8 @@
 """Shared workspace components: navigation, records, forms and voice profiles."""
 import streamlit as st
 import pandas as pd
+from datetime import date,timedelta
+from backend.config import local_now
 from backend.attendance_handler import AttendanceHandler
 from backend.enrollment_handler import EnrollmentHandler
 from ui.references import reference_select
@@ -18,17 +20,17 @@ def navigation(role,title,subtitle,views):
     show_notice()
     return st.radio('Workspace section',views,horizontal=True,key=f'{role}_view')
 
-def records_table(rows,key,empty='No records yet. Records appear here after your first successful check-in.'):
+def records_table(rows,key,empty='No records yet. Records appear here after your first successful check-in.',filters=True):
     if not rows:
         st.info(empty)
         return
     df=pd.DataFrame(rows)
     with st.container(border=True):
-        search=st.text_input('Search records',key=f'{key}_search',placeholder='Search names, usernames or record details')
+        search=st.text_input('Search records',key=f'{key}_search',placeholder='Search names, usernames or record details') if filters else ''
         if search.strip():
             mask=df.astype(str).apply(lambda column:column.str.contains(search.strip(),case=False,regex=False)).any(axis=1)
             df=df[mask]
-        if 'date' in df.columns:
+        if filters and 'date' in df.columns:
             dates=sorted(df['date'].astype(str).unique(),reverse=True)
             date=st.selectbox('Attendance date',['All dates',*dates],key=f'{key}_date')
             if date!='All dates':
@@ -38,19 +40,64 @@ def records_table(rows,key,empty='No records yet. Records appear here after your
             st.info('No records match these filters. Try a different search.')
         else:
             # Internal identifiers and voice vectors are not part of display/export.
-            df=df.drop(columns=[c for c in df if c.endswith('_id') or c in ('password_hash','embedding_vector')])
+            df=df.drop(columns=[c for c in df if c.endswith('_id') or c.startswith('_') or c in ('password_hash','embedding_vector')])
             df=df.rename(columns={c:c.replace('_',' ').title() for c in df})
             st.dataframe(df,use_container_width=True,hide_index=True)
             # Prevent spreadsheet formula injection in CSV exports.
             export=df.map(csv_safe)
             st.download_button('Download filtered CSV',export.to_csv(index=False).encode('utf-8'),f'{key}.csv','text/csv',key=f'{key}_download')
 
-def personal_attendance(db,user_id,key):
-    rows=AttendanceHandler(db).get_user_attendance(user_id)
+def paginated_records(loader,key,*,attendance=False,signature=(),transform=None):
+    search=st.text_input('Search all records',max_chars=100,key=f'{key}_server_search',placeholder='Search usernames, names or roll numbers')
+    start=end=None
+    if attendance:
+        a,b=st.columns(2)
+        start=a.date_input('From date',local_now().date()-timedelta(days=30),key=f'{key}_from')
+        end=b.date_input('To date',local_now().date(),key=f'{key}_to')
+        if start>end:
+            st.warning('Choose a start date before the end date.'); return []
+    token=(search,str(start),str(end),*signature)
+    state=st.session_state.get(f'{key}_paging')
+    if not state or state['signature']!=token:
+        state={'signature':token,'cursors':[None]}
+        st.session_state[f'{key}_paging']=state
+    rows=loader(search=search,start=start,end=end,after=state['cursors'][-1],limit=101)
+    visible=rows[:100]
+    records_table(transform(visible) if transform else visible,key,'No records match this view. Try different filters or dates.',filters=False)
+    st.caption(f'Page {len(state["cursors"])} · Up to 100 records per page. CSV exports this page only.')
     a,b=st.columns(2)
-    a.metric('Recorded attendance days',len(rows))
-    b.metric('Latest check-in',str(rows[0]['date']) if rows else 'Not yet')
-    records_table(rows,key)
+    if a.button('Previous page',key=f'{key}_previous',disabled=len(state['cursors'])==1):
+        state['cursors'].pop(); st.rerun()
+    if b.button('Next page',key=f'{key}_next',disabled=len(rows)<=100):
+        last=visible[-1]
+        state['cursors'].append((last['date'],last['_record_id']) if attendance else last['user_id'])
+        st.rerun()
+    return visible
+
+def attendance_records(db,user_id,key,*,own=False,role=None):
+    from backend.records import attendance_page
+    return paginated_records(lambda **args:attendance_page(db,user_id,own=own,role=role,**args),key,attendance=True,signature=(role,own))
+
+def personal_attendance(db,user_id,key):
+    from backend.records import attendance_summary
+    summary=attendance_summary(db,user_id)
+    a,b=st.columns(2)
+    a.metric('Recorded attendance days',summary['total'])
+    b.metric('Latest check-in',summary['latest'] or 'Not yet')
+    attendance_records(db,user_id,key,own=True)
+
+def voice_people(db,actor_id,key,department=None):
+    from backend.directory import campus_accounts,department_students
+    query=st.text_input('Find an account',max_chars=100,key=f'{key}_find',placeholder='Enter at least 2 characters of a username, name or roll number')
+    if len(query.strip())<2:
+        st.info('Search for an account to manage its voice profile.'); return []
+    if department is not None:
+        rows=department_students(db,department,actor_id=actor_id,search=query,active=True,limit=101)
+    else:
+        rows=campus_accounts(db,actor_id=actor_id,search=query,active=True,roles=('teacher','faculty'),limit=101)
+    if len(rows)>100:
+        st.info('More than 100 accounts match. Refine the search to find the intended account.')
+    return rows[:100]
 
 def enrollment_form(db,role,department=None):
     title=f'Create {role.title()}' if role!='student' else 'Enroll Student'
@@ -139,7 +186,7 @@ def voice_workspace(db,people,key):
                 for number,file in enumerate(files,1):
                     try:
                         vector=model.generate_embedding(processor.process_file(file))
-                        result=AttendanceHandler(db).add_voice_embedding(uid,vector)
+                        result=AttendanceHandler(db).add_voice_embedding(uid,vector,actor_id=st.session_state.user['user_id'])
                         if result['status']: saved+=1
                         else: messages.append(f"Sample {number}: {result['message']}")
                     except ValidationError as exc:

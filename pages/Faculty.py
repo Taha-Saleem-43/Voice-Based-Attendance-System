@@ -1,7 +1,7 @@
 """Faculty workspace scoped to the current department."""
 import streamlit as st
 from ui.layout import inject_css,role_guard,logout_button,error_boundary
-from ui.workspace import navigation,records_table,personal_attendance,enrollment_form,voice_workspace
+from ui.workspace import navigation,personal_attendance,enrollment_form,voice_workspace,voice_people,paginated_records
 from backend.directory import faculty_department,department_students
 
 st.set_page_config(page_title='Faculty · VBAS',page_icon='🧑‍🔬',layout='wide',initial_sidebar_state='collapsed')
@@ -19,11 +19,11 @@ with error_boundary('faculty-workspace'):
         personal_attendance(db,uid,'faculty_attendance')
     elif view=='Students':
         st.subheader(f"Students · {department['dept_name']}")
-        people=department_students(db,department['dept_id'])
-        records_table([{**{k:v for k,v in p.items() if k!='is_active'},'status':'Active' if p['is_active'] else 'Suspended'} for p in people],'faculty_students','No students enrolled yet. Open Enroll student to add the first student.')
+        paginated_records(lambda search,after,limit,**unused:department_students(db,department['dept_id'],actor_id=uid,search=search,after=after or 0,limit=limit),'faculty_students',
+            signature=(department['dept_id'],),transform=lambda rows:[{**{k:v for k,v in p.items() if k!='is_active'},'status':'Active' if p['is_active'] else 'Suspended'} for p in rows])
     elif view=='Enroll student':
         enrollment_form(db,'student',department)
     elif view=='Voice profiles':
-        people=[p for p in department_students(db,department['dept_id']) if p['is_active']]
+        people=voice_people(db,uid,'faculty_voice',department['dept_id'])
         voice_workspace(db,people,'faculty_voice')
 logout_button('logout_faculty')
