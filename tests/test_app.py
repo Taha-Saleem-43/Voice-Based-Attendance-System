@@ -190,5 +190,26 @@ class AppTests(unittest.TestCase):
         self.assertTrue(any('Confirm removal' in item.value for item in app.warning))
         self.assertIsNotNone(self.db.execute('SELECT 1 FROM departments WHERE dept_id=2',fetchone=True))
 
+    def test_directory_navigation_is_bounded_and_search_resets_cursor(self):
+        with self.db.transaction() as conn:
+            for i in range(160):
+                conn.execute("INSERT INTO users (username,password_hash,role,created_at) VALUES (?,?,'student','fixture')",(f'qa{i:03d}',b'fixture'))
+        app=AppTest.from_file(str(ROOT/'pages/chairman.py'),default_timeout=60)
+        app.session_state.user=self.admin
+        app.session_state.chairman_view='Directory'
+        # Fixture-only diagnostics surface dependency failures in CI; production
+        # continues to use redacted support references.
+        with patch('ui.layout.report_error',side_effect=lambda operation,exc:f'{type(exc).__name__}: {exc}'):
+            app.run()
+        self.assertEqual(len(app.exception),0)
+        self.assertEqual(len(app.error),0,[item.value for item in app.error])
+        self.assertEqual(len(app.dataframe[0].value),100)
+        next(b for b in app.button if b.label=='Next page').click().run()
+        self.assertEqual(len(app.dataframe[0].value),60)
+        next(w for w in app.text_input if w.label=='Search all records').set_value('qa155').run()
+        self.assertEqual(len(app.dataframe[0].value),1)
+        self.assertEqual(app.dataframe[0].value.iloc[0]['Username'],'qa155')
+        self.assertTrue(any('Page 1' in c.value for c in app.caption))
+
 if __name__ == '__main__':
     unittest.main()

@@ -42,9 +42,10 @@ def records_table(rows,key,empty='No records yet. Records appear here after your
             # Internal identifiers and voice vectors are not part of display/export.
             df=df.drop(columns=[c for c in df if c.endswith('_id') or c.startswith('_') or c in ('password_hash','embedding_vector')])
             df=df.rename(columns={c:c.replace('_',' ').title() for c in df})
-            st.dataframe(df,use_container_width=True,hide_index=True)
             # Prevent spreadsheet formula injection in CSV exports.
             export=df.map(csv_safe)
+            # Streamlit's own table download must use the safe values too.
+            st.dataframe(export,use_container_width=True,hide_index=True)
             st.download_button('Download filtered CSV',export.to_csv(index=False).encode('utf-8'),f'{key}.csv','text/csv',key=f'{key}_download')
 
 def paginated_records(loader,key,*,attendance=False,signature=(),transform=None):
