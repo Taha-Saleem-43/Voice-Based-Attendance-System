@@ -10,6 +10,8 @@ class AttendanceHandler:
 
     def mark_attendance(self, user_id, role=None, dept_id=None, semester_id=None,
                         section_id=None, confidence=None, marked_by='voice',supervisor_id=None):
+        if marked_by == 'manual' and supervisor_id is None:
+            return {'status':False,'message':'An assigned staff account must confirm manual attendance.'}
         if confidence is not None and (not np.isfinite(confidence) or not -1 <= confidence <= 1):
             return {'status': False, 'message': 'Invalid similarity score.'}
         if marked_by not in ('voice', 'manual'):
@@ -36,6 +38,14 @@ class AttendanceHandler:
             if not profile:
                 return {'status': False, 'message': 'Profile is incomplete. Contact the administrator.'}
             profile = dict(profile)
+            if marked_by == 'manual':
+                if supervisor_id == user_id:
+                    return {'status':False,'message':'Ask another assigned staff member to confirm your attendance.'}
+                if supervisor['role'] != 'chairman':
+                    staff_table = 'faculty' if supervisor['role']=='faculty' else 'teachers'
+                    staff_profile = conn.execute(f'SELECT * FROM {staff_table} WHERE user_id=?',(supervisor_id,)).fetchone()
+                    if role != 'student' or not staff_profile or staff_profile['dept_id'] != profile['dept_id'] or (supervisor['role']=='teacher' and staff_profile['section_id'] != profile['section_id']):
+                        return {'status':False,'message':'You can confirm attendance only for students assigned to you.'}
             inserted = conn.execute(
                 'INSERT INTO attendance (user_id,role,dept_id,semester_id,section_id,date,time,confidence,marked_by) '
                 'VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT (user_id,date) DO NOTHING RETURNING attendance_id',
@@ -43,6 +53,8 @@ class AttendanceHandler:
                  now.date().isoformat(),now.time().isoformat(),confidence,marked_by)).fetchone()
             if not inserted:
                 return {'status': False, 'message': 'Attendance already marked today.'}
+            if marked_by == 'manual':
+                audit_event(conn,supervisor_id,'attendance.manual',user_id)
         return {'status': True, 'message': 'Attendance marked successfully.'}
 
     def get_active_voice_profiles(self,username=None):
@@ -50,7 +62,7 @@ class AttendanceHandler:
             "SELECT e.user_id,e.embedding_vector,u.username,u.role FROM voice_embeddings e "
             "JOIN users u ON u.user_id=e.user_id WHERE u.is_active=1 AND u.role IN ('student','teacher','faculty')"+
             (' AND u.username=?' if username is not None else '')+' ORDER BY e.embedding_id LIMIT ?',
-            (username,11) if username is not None else (1001,),fetch=True)
+            (username,11) if username is not None else (20001,),fetch=True)
 
     # ==================================================
     # DASHBOARD-SPECIFIC FETCH FUNCTIONS

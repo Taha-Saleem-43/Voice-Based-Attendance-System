@@ -21,8 +21,8 @@ class VoiceCheckinService:
             if not claimed_username or len(claimed_username)>100:
                 raise ValidationError('Enter the enrolled person’s campus username.')
         profiles=self.attendance.get_active_voice_profiles(claimed_username)
-        if len(profiles)> (10 if claimed_username is not None else 1000):
-            raise ValidationError('Use username-based verification. Ask the administrator to review the enrolled samples.')
+        if len(profiles)> (10 if claimed_username is not None else 20000):
+            raise ValidationError('The station profile limit has been reached. Ask assigned staff for manual attendance.')
         if not profiles:
             raise ValidationError('No active voice profile is available for this check-in.')
         live=self.model.generate_embedding(self.processor.process_file(audio_file))
@@ -37,12 +37,19 @@ class VoiceCheckinService:
                 continue
             grouped.setdefault(profile['user_id'],[]).append(vector)
             identities[profile['user_id']]=profile
-        best_id,score=None,-1.0
+        if len(grouped)>2000:
+            raise ValidationError('The station account limit has been reached. Ask assigned staff for manual attendance.')
+        best_id,score,runner_up=None,-1.0,-1.0
         for uid,vectors in grouped.items():
             similarity=self.model.compute_similarity(live,np.mean(vectors,axis=0))
             if similarity>score:
+                runner_up=score
                 best_id,score=uid,similarity
+            elif similarity>runner_up:
+                runner_up=similarity
         if best_id is None or score<SPEAKER_VERIFICATION_THRESHOLD:
             return {'status':False,'matched':False,'message':'Voice not recognized. Try again in a quieter space or contact your faculty.'}
+        if claimed_username is None and runner_up>=score-0.05:
+            return {'status':False,'matched':False,'message':'Voice match is uncertain. Try again or ask assigned staff for manual attendance.'}
         result=self.attendance.mark_attendance(best_id,confidence=float(score),supervisor_id=supervisor_id)
         return {**result,'matched':True,'username':identities[best_id]['username'],'role':identities[best_id]['role'],'similarity':score}
