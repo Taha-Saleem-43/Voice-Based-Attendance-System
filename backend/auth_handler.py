@@ -1,3 +1,4 @@
+from backend.errors import ValidationError, report_error
 import time
 import bcrypt
 from backend.database import DatabaseHandler
@@ -6,7 +7,7 @@ from backend.config import local_now
 def password_hash(password):
     size = len(password.encode('utf-8'))
     if size < 10 or size > 72:
-        raise ValueError('Password must be at least 10 UTF-8 bytes and at most 72 bytes.')
+        raise ValidationError('Password must be at least 10 UTF-8 bytes and at most 72 bytes.')
     return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
 class AuthHandler:

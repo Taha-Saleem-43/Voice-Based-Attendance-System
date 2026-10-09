@@ -50,6 +50,10 @@ The database adapter supports SQLite and PostgreSQL with foreign keys, atomic en
 
 ## Verification
 
+Role workspaces show one section at a time. Account forms retain invalid inputs and clear after successful creation. Searchable record tables export the current filtered results; CSV formulas are neutralized. Academic reference removal and voice-sample removal require a selected record, a confirmation checkbox, and an explicit submit. References in use cannot be removed. Accounts can be suspended or reactivated while retaining attendance history.
+
+Shared presentation lives in `ui/`, domain operations in `backend/`, and role entry points in `pages/`. Unexpected failures display a support reference without exception text, SQL, credentials, or certificate details. GitHub Actions runs dependency checks, source compilation, regression tests, and source-only packaging on pushes and pull requests. See `CONTRIBUTING.md` for the feature-branch workflow.
+
 Chairman reference creation uses separate submit forms. Typing does not insert rows. A successful submit saves to the database, clears the form, refreshes the reference cache, and displays confirmation. Repeated or concurrent identical submissions use database uniqueness plus `ON CONFLICT DO NOTHING`, producing an already-exists notice rather than another row or a raw SQL error. Names have surrounding/repeated whitespace normalized; semester values remain restricted to 1–8. Reference creation rechecks active chairman authorization on the server.
 
 Reference lists (departments, sections, semesters) use a bounded in-memory cache with a 60-second TTL. Chairman additions invalidate the affected list immediately. Cache keys isolate each database. Theme CSS is cached until its file modification time changes. Voice models use one shared resource cache. Account status, authorization, voice-profile activity, attendance reads, and attendance writes remain uncached so security and daily check-in decisions use current records. Cache contents are cleared when the app process restarts; free-host cold starts still take time.

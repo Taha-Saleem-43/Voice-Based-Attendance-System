@@ -148,9 +148,9 @@ class AttendanceHandler:
                     'INSERT INTO voice_embeddings (user_id,embedding_vector,sample_type,created_at) VALUES (?,?,?,?)',
                     (user_id,vector.tobytes(),sample_type,local_now().isoformat()))
             return {'status': True, 'message': 'Voice embedding saved successfully.'}
-        except Exception:
-            import logging
-            logging.exception('Voice enrollment failed')
+        except Exception as exc:
+            from backend.errors import report_error
+            report_error('voice-enrollment',exc)
             return {'status': False, 'message': 'Voice enrollment failed. Contact the administrator.'}
 
     def get_voice_embeddings(self, user_id):

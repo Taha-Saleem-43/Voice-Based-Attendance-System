@@ -1,3 +1,4 @@
+from backend.errors import ValidationError
 """Supervised identification: only staff sessions or an unlocked kiosk may scan."""
 import numpy as np
 from backend.config import SPEAKER_VERIFICATION_THRESHOLD
@@ -12,12 +13,12 @@ class VoiceCheckinService:
         if supervisor_id is not None:
             actor=self.db.execute("SELECT 1 FROM users WHERE user_id=? AND is_active=1 AND role IN ('chairman','teacher','faculty')",(supervisor_id,),fetchone=True)
             if not actor:
-                raise ValueError('An active staff account is required to supervise check-in.')
+                raise ValidationError('An active staff account is required to supervise check-in.')
         elif not kiosk_authorized:
-            raise ValueError('Ask a staff member to unlock this check-in station.')
+            raise ValidationError('Ask a staff member to unlock this check-in station.')
         profiles=self.attendance.get_active_voice_profiles()
         if not profiles:
-            raise ValueError('No active voice profiles are enrolled yet.')
+            raise ValidationError('No active voice profiles are enrolled yet.')
         live=self.model.generate_embedding(self.processor.process_file(audio_file))
         grouped={}
         identities={}

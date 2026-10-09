@@ -2,8 +2,28 @@
 from pathlib import Path
 from html import escape
 from functools import lru_cache
+from contextlib import contextmanager
 import streamlit as st
 from backend.config import ROOT, setting
+from backend.errors import ValidationError,report_error
+
+@contextmanager
+def error_boundary(operation):
+    try:
+        yield
+    except ValidationError as exc:
+        st.warning(str(exc))
+    except Exception as exc:
+        st.error(report_error(operation,exc))
+
+def flash(message,kind='success'):
+    st.session_state['workspace_notice']=(kind,message)
+    st.rerun()
+
+def show_notice():
+    notice=st.session_state.pop('workspace_notice',None)
+    if notice:
+        getattr(st,notice[0])(notice[1])
 
 @lru_cache(maxsize=4)
 def _theme_css(path,modified_ns):
@@ -33,7 +53,14 @@ def role_guard(required_role: str):
     """Check current database account status and required role."""
     from backend.database import DatabaseHandler
     from backend.session import refresh_session
-    refresh_session(DatabaseHandler())
+    try:
+        db=DatabaseHandler()
+        refresh_session(db)
+    except Exception as exc:
+        st.error(report_error('workspace-startup',exc))
+        if st.button('Try again',key='retry_workspace'):
+            st.rerun()
+        st.stop()
     if "user" not in st.session_state or st.session_state.user is None:
         inject_css()
         st.markdown("""
@@ -57,6 +84,8 @@ def role_guard(required_role: str):
         </div>
         """, unsafe_allow_html=True)
         st.stop()
+
+    return db
 
 
 def logout_button(key="logout"):
