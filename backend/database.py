@@ -20,7 +20,9 @@ class DatabaseHandler:
         if self.postgres and not self.url.startswith(('postgresql://', 'postgres://')):
             raise ValueError('DATABASE_URL must be a PostgreSQL connection URL.')
         self.db_path = str(Path(db_path or DB_PATH).resolve())
-        initialize(self.url, self.db_path)
+        # After provisioning, a restricted runtime role can skip owner-only DDL.
+        if not self.postgres or str(setting('DB_AUTO_INITIALIZE','true')).lower()!='false':
+            initialize(self.url, self.db_path)
 
     def _connect(self):
         if self.postgres:
@@ -86,6 +88,14 @@ def initialize(url, path):
         for statement in schema.split(';'):
             if statement.strip():
                 raw.execute(statement)
+        if postgres:
+            roles=raw.execute("SELECT rolname FROM pg_roles WHERE rolname IN ('anon','authenticated')").fetchall()
+            if len(roles)==2:
+                # Supabase defaults can otherwise expose newly created tables.
+                # Apply privacy protections before the schema transaction commits.
+                security=Path(__file__).with_name('supabase_security.sql').read_text(encoding='utf-8')
+                for statement in security.split(';'):
+                    if statement.strip(): raw.execute(statement)
         raw.commit()
     except BaseException:
         raw.rollback()

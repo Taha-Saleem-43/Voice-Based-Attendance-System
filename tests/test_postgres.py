@@ -20,6 +20,13 @@ class PostgresTests(unittest.TestCase):
         config=conninfo_to_dict(URL)
         if config.get('host') not in ('localhost','127.0.0.1') or config.get('dbname')!='vbas_test':
             raise RuntimeError('Integration tests require localhost and the disposable vbas_test database.')
+        import psycopg
+        with psycopg.connect(URL) as conn:
+            for role in ('anon','authenticated'):
+                if not conn.execute('SELECT 1 FROM pg_roles WHERE rolname=%s',(role,)).fetchone():
+                    conn.execute(f'CREATE ROLE {role} NOLOGIN')
+            # Reproduce Supabase-style default API grants in the CI fixture.
+            conn.execute('ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon,authenticated')
         cls.db=DatabaseHandler(database_url=URL)
 
     def setUp(self):
@@ -68,3 +75,10 @@ class PostgresTests(unittest.TestCase):
         from backend.management import delete_reference
         from backend.errors import ValidationError
         with self.assertRaises(ValidationError): delete_reference(self.db,self.admin,'departments',1)
+
+    def test_schema_initialization_protects_tables_from_public_api_roles(self):
+        rows=self.db.execute("SELECT tablename,rowsecurity FROM pg_tables WHERE schemaname='public'",fetch=True)
+        self.assertEqual(len(rows),11)
+        self.assertTrue(all(r['rowsecurity'] for r in rows))
+        grants=self.db.execute("SELECT COUNT(*) AS n FROM information_schema.role_table_grants WHERE table_schema='public' AND grantee IN ('anon','authenticated')",fetchone=True)
+        self.assertEqual(grants['n'],0)

@@ -116,3 +116,10 @@ class ScaleTests(unittest.TestCase):
             self.assertEqual(kwargs['max_waiting'],32)
             self.assertIsNone(kwargs['kwargs']['prepare_threshold'])
         _pools.pop(fake,None)
+
+    def test_restricted_runtime_mode_does_not_attempt_schema_ddl(self):
+        from backend.database import DatabaseHandler
+        with patch('backend.database.setting',return_value='false'),patch('backend.database.initialize') as initialize:
+            db=DatabaseHandler(database_url='postgresql://fixture.invalid/fixture')
+        self.assertTrue(db.postgres)
+        initialize.assert_not_called()

@@ -48,6 +48,7 @@ Environment variables override `.streamlit/secrets.toml` and Streamlit Cloud sec
 | ATTENDANCE_TIMEZONE | Defaults to Asia/Karachi |
 | SPEAKER_VERIFICATION_THRESHOLD | Defaults to 0.5962; calibrate on independent recordings |
 | DB_POOL_SIZE | PostgreSQL connections per app process, defaults to 4; budget across all replicas |
+| DB_AUTO_INITIALIZE | Set to false after administrator-run schema provisioning to use a restricted runtime database role |
 
 The database adapter supports SQLite and PostgreSQL with foreign keys, atomic enrollment, uniqueness of daily attendance, and account rechecks. Existing local schema is retained; startup adds missing tables/indexes. Back up the original database before any separate migration. Use an empty cloud database for a clean deployment.
 

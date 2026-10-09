@@ -39,6 +39,8 @@ The script creates and removes a temporary local database. It never uses deploym
 
 For larger scale, retain Postgres but separate web sessions from a bounded inference worker service, add a persistent job queue and monitor it, size compute for measured arrivals, and load-test the complete system. Horizontal replicas require coordinated rate limits and session routing; the current Streamlit session state and per-process queues do not implement that distributed architecture.
 
+For capacity planning, 20,000 people attending on 250 days create five million attendance rows per year. Multiple class sessions would multiply that figure. Measure PostgreSQL table/index growth and choose retention and storage from those measurements; the current 500 MB free-plan database limit is not a university-wide storage guarantee. After schema provisioning by an administrator, `DB_AUTO_INITIALIZE=false` lets the runtime use a restricted database role without startup DDL. Automatic Supabase initialization applies the RLS/revoke rules before committing new tables.
+
 ## Current hosting references
 
 - [Streamlit Community Cloud resources and hibernation](https://docs.streamlit.io/deploy/streamlit-community-cloud/manage-your-app)
