@@ -1,5 +1,15 @@
 # Deployment preparation validation
 
+## Scale audit — 9 October 2026
+
+Final local suite: **58 passed, 4 skipped** (62 discovered, 69.23 seconds). The four skipped cases require the disposable PostgreSQL CI service. Dependency compatibility and source compilation passed. The updated real model loaded in 4.71 seconds and produced a finite normalized 192-dimensional real-recording embedding in 9.63 seconds; parameters remain frozen.
+
+Fresh Linux CI caught a transitive dependency regression: PyArrow 26 requires NumPy 2, while the validated audio stack uses NumPy 1.26. The resolved dependency constraints retain PyArrow 25.0.1, and a direct Arrow table-conversion test guards this compatibility. A Streamlit navigation test verifies next-page boundaries and server-search cursor reset. All four disposable PostgreSQL integration tests passed before resolving the table-rendering dependency failure; see the final PR check for the complete rerun result.
+
+Synthetic local benchmark: 20,000 students, 20,000 voice profiles, 600,000 attendance rows, 20 concurrent workers, 400 reads, zero failures. Read p50 43 ms, p95 775 ms, maximum 1,095 ms. Twenty duplicate writes produced one row and twenty independent writes succeeded. Browser, network, bcrypt and inference are excluded; this is not a hosted capacity certification.
+
+Remote Supabase audit: healthy, initially one account/no voice or attendance data, no public API table grants. Additive indexes and the protected audit table were applied and verified. Missing foreign-key index notices were resolved; unused-index notices remain on the almost-empty database. See `READINESS.md`: university-wide production approval remains pending, with concrete acceptance gates.
+
 ## Workspace overhaul — 9 October 2026
 
 The final regression run passed **49 tests in 70.89 seconds**, using the project `.deploy-venv`. Temporary-database tests required sandbox permission on Windows. Source compilation passed. Tests cover all role sections without model initialization, safe error messages and logs, confirmations, stale account-state updates, scoped voice removal, retained invalid form inputs, CSV formula handling, and lightweight backend imports. The real-recording model smoke test passed: a finite normalized 192-dimensional embedding, frozen parameters, 6.88-second load and 14.45-second inference. Timings are local observations.

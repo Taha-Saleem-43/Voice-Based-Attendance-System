@@ -3,6 +3,7 @@ from backend.errors import ValidationError, report_error
 import logging
 from backend.auth_handler import password_hash
 from backend.config import local_now
+from backend.audit import audit_event
 
 class EnrollmentHandler:
     def __init__(self, db_handler, actor_user_id=None):
@@ -11,15 +12,15 @@ class EnrollmentHandler:
 
     def _enroll(self, username, password, role, fields):
         username = username.strip()
-        if not username or len(username) > 100 or not str(fields.get('name', '')).strip():
+        if not username or len(username) > 100 or not str(fields.get('name', '')).strip() or len(str(fields.get('name','')).strip())>150:
             return {'status': False, 'message': 'Username and full name are required (username: 1-100 characters).'}
-        if role == 'student' and not fields['roll_no'].strip():
+        if role == 'student' and (not fields['roll_no'].strip() or len(fields['roll_no'].strip())>100):
             return {'status': False, 'message': 'Roll number is required.'}
         try:
             hashed = password_hash(password)
             with self.db.transaction() as conn:
                 if self.actor_user_id is not None:
-                    actor = conn.execute('SELECT role,is_active FROM users WHERE user_id=?', (self.actor_user_id,)).fetchone()
+                    actor = conn.execute('SELECT role,is_active FROM users WHERE user_id=?'+(' FOR SHARE' if self.db.postgres else ''), (self.actor_user_id,)).fetchone()
                     if not actor or not actor['is_active']:
                         raise ValidationError('Your account is unavailable. Log in again.')
                     if actor['role'] == 'faculty':
@@ -48,6 +49,7 @@ class EnrollmentHandler:
                 columns = ['user_id', *fields]
                 values = [user_id, *(v.strip() if isinstance(v, str) else v for v in fields.values())]
                 conn.execute(f'INSERT INTO {table} ({",".join(columns)}) VALUES ({",".join("?" for _ in columns)})', values)
+                audit_event(conn,self.actor_user_id,f'{role}-enrolled',user_id)
             return {'status': True, 'message': f'{role.title()} enrolled successfully.', 'user_id': user_id}
         except ValidationError as exc:
             return {'status': False, 'message': str(exc)}

@@ -52,3 +52,21 @@ CREATE TABLE IF NOT EXISTS login_attempts (
 );
 CREATE INDEX IF NOT EXISTS embeddings_user_idx ON voice_embeddings(user_id);
 CREATE INDEX IF NOT EXISTS students_group_idx ON students(dept_id,section_id);
+CREATE INDEX IF NOT EXISTS students_section_idx ON students(section_id);
+CREATE INDEX IF NOT EXISTS students_semester_idx ON students(semester_id);
+CREATE INDEX IF NOT EXISTS teachers_dept_idx ON teachers(dept_id);
+CREATE INDEX IF NOT EXISTS teachers_section_idx ON teachers(section_id);
+CREATE INDEX IF NOT EXISTS faculty_dept_idx ON faculty(dept_id);
+CREATE INDEX IF NOT EXISTS attendance_dept_date_idx ON attendance(dept_id,date,attendance_id);
+CREATE INDEX IF NOT EXISTS attendance_section_idx ON attendance(section_id);
+CREATE INDEX IF NOT EXISTS attendance_semester_idx ON attendance(semester_id);
+CREATE INDEX IF NOT EXISTS attendance_date_page_idx ON attendance(date DESC,attendance_id DESC);
+CREATE TABLE IF NOT EXISTS audit_events (
+ event_id INTEGER PRIMARY KEY AUTOINCREMENT,
+ actor_id INTEGER REFERENCES users(user_id),
+ operation TEXT NOT NULL,
+ target_id INTEGER,
+ created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS audit_created_idx ON audit_events(created_at);
+CREATE INDEX IF NOT EXISTS audit_actor_idx ON audit_events(actor_id);

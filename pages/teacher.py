@@ -1,7 +1,7 @@
 """Teacher workspace restricted to the assigned student group."""
 import streamlit as st
 from ui.layout import inject_css,role_guard,logout_button,error_boundary
-from ui.workspace import navigation,personal_attendance,records_table
+from ui.workspace import navigation,personal_attendance,attendance_records
 from backend.attendance_handler import AttendanceHandler
 
 st.set_page_config(page_title='Teacher · VBAS',page_icon='👨‍🏫',layout='wide',initial_sidebar_state='collapsed')
@@ -20,8 +20,7 @@ with error_boundary('teacher-workspace'):
         if not profile or profile['section_id'] is None:
             st.info('Ask the chairman to assign your department and section before viewing student records.')
         else:
-            rows=attendance.get_teacher_students_attendance(profile['dept_id'],profile['section_id'])
-            records_table(rows,'teacher_students','No attendance records for your assigned students yet.')
+            attendance_records(db,uid,'teacher_students')
     else:
         st.subheader('Campus check-in')
         st.write('Open the attendance hub to supervise voice check-ins. Ask the chairman to correct academic assignments; faculty manage student enrollment and voice profiles.')

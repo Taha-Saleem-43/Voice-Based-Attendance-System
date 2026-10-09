@@ -1,7 +1,7 @@
 """Chairman workspace: one focused section per interaction."""
 import streamlit as st
 from ui.layout import inject_css,role_guard,logout_button,error_boundary,flash
-from ui.workspace import navigation,records_table,enrollment_form,voice_workspace
+from ui.workspace import navigation,records_table,enrollment_form,voice_workspace,voice_people,paginated_records,attendance_records
 from backend.attendance_handler import AttendanceHandler
 from backend.directory import campus_accounts
 from backend.reference_cache import reference_rows,REFERENCE_COLUMNS
@@ -21,24 +21,24 @@ with error_boundary('chairman-workspace'):
         counts=db.execute("SELECT role,COUNT(*) AS total FROM users WHERE is_active=1 AND role!='chairman' GROUP BY role",fetch=True)
         totals={r['role']:r['total'] for r in counts}
         for column,role in zip(st.columns(3),('student','teacher','faculty')):
-            column.metric(f'Active {role}s',totals.get(role,0))
+            column.metric({'student':'Active students','teacher':'Active teachers','faculty':'Active faculty'}[role],totals.get(role,0))
         st.markdown('### Set up your campus')
         st.write('1. Add departments, sections and semesters in Academic setup.\n2. Create teacher and faculty accounts.\n3. Faculty enroll students and consented voice samples.\n4. Supervise voice check-in from the attendance hub.')
         st.info('Use the workspace navigation above to open one task at a time. Accounts are suspended or reactivated from Directory; attendance history is retained.')
     elif view=='Attendance':
         st.subheader('Campus attendance')
-        rows=AttendanceHandler(db).get_all_attendance()
         role=st.selectbox('Role',['All roles','student','teacher','faculty'])
-        if role!='All roles': rows=[r for r in rows if r['role']==role]
-        records_table(rows,'campus_attendance')
+        attendance_records(db,actor,'campus_attendance',role=None if role=='All roles' else role)
     elif view=='Directory':
         st.subheader('Campus directory')
-        people=campus_accounts(db)
         a,b=st.columns(2)
         role=a.selectbox('Role',['All roles','student','teacher','faculty'])
         status=b.selectbox('Account status',['All statuses','Active','Suspended'])
-        filtered=[{**p,'status':'Active' if p['is_active'] else 'Suspended'} for p in people if (role=='All roles' or p['role']==role) and (status=='All statuses' or bool(p['is_active'])==(status=='Active'))]
-        records_table([{k:v for k,v in p.items() if k!='is_active'} for p in filtered],'campus_directory','No accounts match these filters. Create an account or change the filters.')
+        def load_accounts(search,after,limit,**unused):
+            return campus_accounts(db,actor_id=actor,search=search,after=after or 0,limit=limit,
+                                   role=None if role=='All roles' else role,active=None if status=='All statuses' else status=='Active')
+        filtered=paginated_records(load_accounts,'campus_directory',signature=(role,status),
+            transform=lambda rows:[{**{k:v for k,v in p.items() if k!='is_active'},'status':'Active' if p['is_active'] else 'Suspended'} for p in rows])
         st.subheader('Account access')
         st.caption('Suspension blocks sign-in and voice check-in. It retains academic records and can be reversed.')
         choices={p['user_id']:p for p in filtered}
@@ -81,7 +81,7 @@ with error_boundary('chairman-workspace'):
                                 delete_reference(db,actor,table,selected)
                                 flash(f'{label} removed.')
     elif view=='Voice profiles':
-        people=[p for p in campus_accounts(db) if p['is_active'] and p['role'] in ('teacher','faculty')]
+        people=voice_people(db,actor,'chairman_voice')
         voice_workspace(db,people,'chairman_voice')
 
 logout_button('logout_chairman')

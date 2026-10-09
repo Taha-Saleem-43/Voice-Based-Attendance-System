@@ -8,6 +8,12 @@ from ui.workspace import csv_safe
 ROOT=Path(__file__).resolve().parent.parent
 
 class StructureTests(unittest.TestCase):
+    def test_pandas_arrow_table_dependency_compatibility(self):
+        import pandas as pd
+        import pyarrow as pa
+        table=pa.Table.from_pandas(pd.DataFrame({'username':['fixture'],'reference':[None]}))
+        self.assertEqual(table.num_rows,1)
+
     def test_backend_import_does_not_load_audio_model_libraries(self):
         result=subprocess.run([sys.executable,'-c',"import backend,sys; assert 'torch' not in sys.modules; assert 'torchaudio' not in sys.modules"],cwd=ROOT,capture_output=True,text=True,timeout=30)
         self.assertEqual(result.returncode,0,result.stderr)
