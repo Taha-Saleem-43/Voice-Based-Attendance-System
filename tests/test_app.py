@@ -197,10 +197,7 @@ class AppTests(unittest.TestCase):
         app=AppTest.from_file(str(ROOT/'pages/chairman.py'),default_timeout=60)
         app.session_state.user=self.admin
         app.session_state.chairman_view='Directory'
-        # Fixture-only diagnostics surface dependency failures in CI; production
-        # continues to use redacted support references.
-        with patch('ui.layout.report_error',side_effect=lambda operation,exc:f'{type(exc).__name__}: {exc}'):
-            app.run()
+        app.run()
         self.assertEqual(len(app.exception),0)
         self.assertEqual(len(app.error),0,[item.value for item in app.error])
         self.assertEqual(len(app.dataframe[0].value),100)

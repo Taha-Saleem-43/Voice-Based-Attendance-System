@@ -84,4 +84,6 @@ Previously exposed credentials in the loose notes were removed, but their owners
 
 ## Dependency compatibility
 
+`constraints.txt` records the resolved dependency versions tested with Python 3.12, including the table rendering/serialization dependency. Install using `requirements.txt` so those constraints apply. Dependency updates must pass both page and PostgreSQL CI checks before deployment.
+
 CPU-only PyTorch/TorchAudio 2.5.1 and Hugging Face Hub 0.28.1 are pinned for SpeechBrain 1.0.3. The previous TorchAudio 2.10 / Hub 1.x combination removed APIs called by this SpeechBrain version. One shared model loader is used across pages; inference is serialized to avoid concurrent mutations of shared inference state. Model weights and stored embedding dimensions remain unchanged.
