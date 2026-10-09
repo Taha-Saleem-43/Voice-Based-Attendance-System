@@ -50,6 +50,18 @@ class AppTests(unittest.TestCase):
         self.assertEqual(app.session_state.user['role'],'chairman')
         self.model_loader.assert_not_called()
 
+    def test_staff_checkin_has_no_enrollment_or_username_requirement(self):
+        app=AppTest.from_file(str(ROOT/'app.py'),default_timeout=20)
+        app.session_state.user=self.admin
+        app.run()
+        self.assertEqual(len(app.exception),0)
+        labels=[button.label for button in app.button]
+        self.assertIn('Mark attendance',labels)
+        self.assertNotIn('New recording',labels)
+        self.assertFalse(any(widget.label=='Campus username for check-in' for widget in app.text_input))
+        self.assertIn('Confirm manual attendance',labels)
+        self.model_loader.assert_not_called()
+
     def test_chairman_and_semester_form(self):
         reference_rows(self.db,'semesters')
         app = AppTest.from_file(str(ROOT/'pages/chairman.py'),default_timeout=20)

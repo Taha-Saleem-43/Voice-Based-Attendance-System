@@ -80,18 +80,15 @@ with checkin_tab:
             else:
                 st.markdown('<div class="pulse-ring"><span class="pulse-dot"></span> STATION READY</div>',unsafe_allow_html=True)
                 st.caption('Record 3–8 seconds of clear speech. Keep your microphone close.')
-                claimed_username=st.text_input('Campus username for check-in',max_chars=100,placeholder='Enter the enrolled person’s username',key='voice_claim')
-                st.caption('Voice verification checks this account only. Staff must confirm the person and username.')
                 audio=st.audio_input('Record your voice',sample_rate=16000,key=f"voice_{st.session_state.get('voice_revision',0)}")
-                verify,clear=st.columns([2,1])
-                if verify.button('Verify & Mark Attendance',type='primary',use_container_width=True,disabled=audio is None or not claimed_username.strip()):
+                if st.button('Mark attendance',type='primary',use_container_width=True,disabled=audio is None):
                     try:
                         if time.monotonic()-st.session_state.get('last_voice_attempt',0)<3:
                             raise ValidationError('Wait a few seconds before another attempt.')
                         st.session_state.last_voice_attempt=time.monotonic()
                         with st.spinner('Matching your voice securely...'):
                             processor,model=load_models()
-                            result=VoiceCheckinService(db,processor,model).identify(audio,supervisor_id=user['user_id'] if is_staff else None,kiosk_authorized=bool(st.session_state.get('kiosk_unlocked')),claimed_username=claimed_username)
+                            result=VoiceCheckinService(db,processor,model).identify(audio,supervisor_id=user['user_id'] if is_staff else None,kiosk_authorized=bool(st.session_state.get('kiosk_unlocked')))
                         if result['status']:
                             st.success(f"Attendance recorded for {result['username']}.")
                             st.caption(f"{local_now().strftime('%d %b %Y · %I:%M %p')} · Similarity {result['similarity']:.3f}")
@@ -103,9 +100,26 @@ with checkin_tab:
                         st.error(str(exc))
                     except Exception as exc:
                         st.error(report_error('voice-checkin',exc))
-                if clear.button('New recording',use_container_width=True):
-                    st.session_state.voice_revision=st.session_state.get('voice_revision',0)+1
-                    st.rerun()
+                with st.expander('Unable to use voice?'):
+                    st.write('Ask assigned staff to confirm your identity and mark attendance manually. Student and voice enrollment are managed in staff workspaces.')
+                    if is_staff:
+                        with st.form('manual_attendance'):
+                            manual_username=st.text_input('Campus username',max_chars=100)
+                            confirmed=st.checkbox('I have checked this person’s identity in person.')
+                            if st.form_submit_button('Confirm manual attendance'):
+                                try:
+                                    if not confirmed or not manual_username.strip():
+                                        raise ValidationError('Enter a username and confirm an in-person identity check.')
+                                    target=db.execute('SELECT user_id FROM users WHERE username=?',(manual_username.strip(),),fetchone=True)
+                                    if not target:
+                                        raise ValidationError('Account unavailable or outside your assignment.')
+                                    result=attendance.mark_attendance(target['user_id'],marked_by='manual',supervisor_id=user['user_id'])
+                                    if result['status']: st.success('Manual attendance recorded.')
+                                    else: st.warning(result['message'])
+                                except ValidationError as exc:
+                                    st.error(str(exc))
+                                except Exception as exc:
+                                    st.error(report_error('manual-checkin',exc))
                 if not is_staff and st.button('Lock station',key='lock_station'):
                     st.session_state.pop('kiosk_unlocked',None)
                     st.rerun()
