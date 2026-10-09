@@ -14,3 +14,18 @@
 @keyframes voice{from{transform:scaleY(.35);opacity:.55}to{transform:scaleY(1);opacity:1}}@keyframes orbit{to{transform:rotate(360deg)}}@keyframes float{50%{transform:translateY(-8px)}}@keyframes beacon{50%{opacity:.4;box-shadow:0 0 3px #75f1cf55}}
 @media(max-width:850px){.block-container{padding:1.3rem 1.2rem 3rem!important}.hero{grid-template-columns:1fr;gap:12px;padding-bottom:24px}.hero-art{min-height:300px;order:2}.hero h1{font-size:47px!important}.brandname span{display:none}.overview-grid{grid-template-columns:1fr}.overview-card{padding:17px 20px}.overview-card .value{font-size:24px}.workspace-header{align-items:flex-start}.workspace-header h1{font-size:28px!important}.product-footer{flex-direction:column;gap:6px}[data-testid="stTabs"] [role="tab"]{padding:0 12px;font-size:11px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+/* Workspace forms: full-width inputs, separate keyboard hints and focus targets. */
+[data-testid="InputInstructions"],[data-testid="stInputInstructions"]{display:none!important}
+.stTextInput [data-baseweb="input"]{min-height:48px!important;align-items:center!important}
+.stTextInput input{min-width:0!important;padding-top:12px!important;padding-bottom:12px!important}
+.stTextInput [data-baseweb="input"] button{flex-shrink:0!important;min-width:40px!important;min-height:40px!important}
+.stForm{max-width:800px;padding:24px!important;border-radius:16px!important;border:1px solid var(--line)!important}
+.stForm [data-testid="stCaptionContainer"]{margin-top:5px;margin-bottom:8px;line-height:1.5}
+.stRadio [role="radiogroup"]{gap:10px!important;flex-wrap:wrap!important;margin:8px 0 22px}
+.stRadio [role="radiogroup"] label{border:1px solid var(--line);border-radius:10px;padding:10px 14px!important;background:#101827;min-height:44px}
+.stRadio [role="radiogroup"] label:has(input:checked){border-color:var(--mint);background:#173330}
+[data-testid="stCheckbox"] label{min-height:44px;align-items:center}
+[data-testid="stTextInput"] label,[data-testid="stSelectbox"] label{margin-bottom:5px}
+.stTextInput:focus-within [data-baseweb="input"]{outline:2px solid #75f1cf66;outline-offset:2px}
+@media(max-width:600px){.stForm{padding:16px!important}.stRadio [role="radiogroup"] label{padding:8px 10px!important}.workspace-header{flex-wrap:wrap}}

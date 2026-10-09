@@ -1,3 +1,4 @@
+from backend.errors import ValidationError, report_error
 """Atomic enrollment with faculty scope checked against the database."""
 import logging
 from backend.auth_handler import password_hash
@@ -20,13 +21,13 @@ class EnrollmentHandler:
                 if self.actor_user_id is not None:
                     actor = conn.execute('SELECT role,is_active FROM users WHERE user_id=?', (self.actor_user_id,)).fetchone()
                     if not actor or not actor['is_active']:
-                        raise ValueError('Your account is unavailable. Log in again.')
+                        raise ValidationError('Your account is unavailable. Log in again.')
                     if actor['role'] == 'faculty':
                         profile = conn.execute('SELECT dept_id FROM faculty WHERE user_id=?', (self.actor_user_id,)).fetchone()
                         if role != 'student' or not profile or profile['dept_id'] != fields['dept_id']:
-                            raise ValueError('Faculty may enroll students only in their own department.')
+                            raise ValidationError('Faculty may enroll students only in their own department.')
                     elif actor['role'] != 'chairman':
-                        raise ValueError('Enrollment is not permitted for your role.')
+                        raise ValidationError('Enrollment is not permitted for your role.')
                 for key, table, column in (
                     ('dept_id', 'departments', 'dept_id'),
                     ('section_id', 'sections', 'section_id'),
@@ -34,11 +35,11 @@ class EnrollmentHandler:
                 ):
                     if key in fields and fields[key] is not None:
                         if not conn.execute(f'SELECT 1 FROM {table} WHERE {column}=?', (fields[key],)).fetchone():
-                            raise ValueError(f'Choose an existing {key.removesuffix("_id")}.')
+                            raise ValidationError(f'Choose an existing {key.removesuffix("_id")}.')
                 if conn.execute('SELECT 1 FROM users WHERE username=?', (username,)).fetchone():
-                    raise ValueError('Username already exists.')
+                    raise ValidationError('Username already exists.')
                 if role == 'student' and conn.execute('SELECT 1 FROM students WHERE roll_no=?', (fields['roll_no'].strip(),)).fetchone():
-                    raise ValueError('Roll number already exists.')
+                    raise ValidationError('Roll number already exists.')
                 user = conn.execute(
                     'INSERT INTO users (username,password_hash,role,created_at) VALUES (?,?,?,?) RETURNING user_id',
                     (username, hashed, role, local_now().isoformat())).fetchone()
@@ -48,10 +49,10 @@ class EnrollmentHandler:
                 values = [user_id, *(v.strip() if isinstance(v, str) else v for v in fields.values())]
                 conn.execute(f'INSERT INTO {table} ({",".join(columns)}) VALUES ({",".join("?" for _ in columns)})', values)
             return {'status': True, 'message': f'{role.title()} enrolled successfully.', 'user_id': user_id}
-        except ValueError as exc:
+        except ValidationError as exc:
             return {'status': False, 'message': str(exc)}
-        except Exception:
-            logging.exception('Enrollment failed; transaction rolled back')
+        except Exception as exc:
+            report_error('enrollment',exc)
             return {'status': False, 'message': 'Enrollment failed. Check for duplicate usernames or roll numbers.'}
 
     def enroll_student(self, username, password, roll_no, name, dept_id, semester_id, section_id):

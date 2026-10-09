@@ -1,5 +1,11 @@
 # Deployment preparation validation
 
+## Workspace overhaul — 9 October 2026
+
+The final regression run passed **49 tests in 70.89 seconds**, using the project `.deploy-venv`. Temporary-database tests required sandbox permission on Windows. Source compilation passed. Tests cover all role sections without model initialization, safe error messages and logs, confirmations, stale account-state updates, scoped voice removal, retained invalid form inputs, CSV formula handling, and lightweight backend imports. The real-recording model smoke test passed: a finite normalized 192-dimensional embedding, frozen parameters, 6.88-second load and 14.45-second inference. Timings are local observations.
+
+GitHub Actions configuration now checks dependencies, compiles sources, runs tests, and packages an explicit source allowlist. A configured workflow is not evidence of a successful remote run; check the feature pull request for its actual result.
+
 Validated on Windows with Python 3.12.8 and the new isolated `.deploy-venv` environment.
 
 - Clean dependency installation: successful; `pip check` reported no broken requirements.

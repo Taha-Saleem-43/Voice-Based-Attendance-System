@@ -54,6 +54,8 @@ class AppTests(unittest.TestCase):
         reference_rows(self.db,'semesters')
         app = AppTest.from_file(str(ROOT/'pages/chairman.py'),default_timeout=20)
         app.session_state.user=self.admin
+        app.session_state.chairman_view='Academic setup'
+        app.session_state.academic_type='semesters'
         app.run()
         self.assertEqual(len(app.exception),0)
         semester=next(widget for widget in app.number_input if widget.label=='Semester Number')
@@ -110,6 +112,7 @@ class AppTests(unittest.TestCase):
         with patch('backend.resources.load_models',side_effect=RuntimeError('model unavailable')):
             app=AppTest.from_file(str(ROOT/'pages/chairman.py'),default_timeout=20)
             app.session_state.user=self.admin
+            app.session_state.chairman_view='Create account'
             app.run()
         self.assertEqual(len(app.exception),0)
         self.assertTrue(any('Create Teacher' in button.label for button in app.button))
@@ -123,6 +126,69 @@ class AppTests(unittest.TestCase):
         app.run()
         self.assertEqual(len(app.exception),0)
         self.assertIsNone(app.session_state.user)
+
+    def test_all_workspace_sections_render_without_loading_model(self):
+        enroll=EnrollmentHandler(self.db)
+        enroll.enroll_faculty('faculty','Test-password-42','Faculty',1)
+        enroll.enroll_teacher('teacher','Test-password-42','Teacher',1,section_id=1)
+        enroll.enroll_student('student','Test-password-42','R1','Student',1,1,1)
+        cases=[('chairman','chairman.py',self.admin,['Overview','Attendance','Directory','Create account','Academic setup','Voice profiles']),
+               ('faculty','Faculty.py',self.auth.login('faculty','Test-password-42'),['My attendance','Students','Enroll student','Voice profiles']),
+               ('teacher','teacher.py',self.auth.login('teacher','Test-password-42'),['My attendance','Student attendance','Help']),
+               ('student','Student.py',self.auth.login('student','Test-password-42'),['My attendance','Help'])]
+        for role,filename,session,views in cases:
+            for view in views:
+                with self.subTest(role=role,view=view):
+                    app=AppTest.from_file(str(ROOT/'pages'/filename),default_timeout=60)
+                    app.session_state.user=session
+                    app.session_state[f'{role}_view']=view
+                    app.run()
+                    self.assertEqual(len(app.exception),0)
+                    self.assertEqual(len(app.error),0)
+                    self.model_loader.assert_not_called()
+
+    def test_database_error_never_displays_sensitive_payload(self):
+        app=AppTest.from_file(str(ROOT/'pages/chairman.py'),default_timeout=60)
+        app.session_state.user=self.admin
+        app.session_state.chairman_view='Directory'
+        payload='postgresql://secret-user:secret-password@private-host SELECT password_hash certificate PRIVATE KEY'
+        with patch('backend.directory.campus_accounts',side_effect=RuntimeError(payload)),self.assertLogs(level='ERROR') as logs:
+            app.run()
+        self.assertEqual(len(app.exception),0)
+        self.assertTrue(any('reference' in item.value for item in app.error))
+        self.assertNotIn(payload,' '.join(item.value for item in app.error))
+        self.assertNotIn(payload,' '.join(logs.output))
+
+    def test_enrollment_preserves_invalid_inputs_and_clears_success(self):
+        app=AppTest.from_file(str(ROOT/'pages/chairman.py'),default_timeout=60)
+        app.session_state.user=self.admin
+        app.session_state.chairman_view='Create account'
+        app.run()
+        next(w for w in app.text_input if w.label=='Username').set_value('newteacher')
+        next(w for w in app.text_input if w.label=='Full name').set_value('New Teacher')
+        next(w for w in app.text_input if w.label=='Password').set_value('Test-password-42')
+        next(w for w in app.text_input if w.label=='Confirm password').set_value('wrong')
+        next(w for w in app.button if w.label=='Create Teacher').click().run()
+        self.assertTrue(any('do not match' in item.value for item in app.warning))
+        self.assertEqual(next(w for w in app.text_input if w.label=='Username').value,'newteacher')
+        self.assertIsNone(self.db.execute("SELECT 1 FROM users WHERE username='newteacher'",fetchone=True))
+        next(w for w in app.text_input if w.label=='Confirm password').set_value('Test-password-42')
+        next(w for w in app.button if w.label=='Create Teacher').click().run()
+        self.assertEqual(len(app.exception),0)
+        self.assertTrue(any('was created' in item.value for item in app.success))
+        self.assertEqual(next(w for w in app.text_input if w.label=='Password').value,'')
+
+    def test_removal_requires_confirmation(self):
+        self.db.execute("INSERT INTO departments (dept_name) VALUES ('Unused')")
+        app=AppTest.from_file(str(ROOT/'pages/chairman.py'),default_timeout=60)
+        app.session_state.user=self.admin
+        app.session_state.chairman_view='Academic setup'
+        app.run()
+        next(w for w in app.selectbox if w.label=='Record to remove').set_value(2).run()
+        next(w for w in app.button if w.label=='Remove selected record').click().run()
+        self.assertEqual(len(app.exception),0)
+        self.assertTrue(any('Confirm removal' in item.value for item in app.warning))
+        self.assertIsNotNone(self.db.execute('SELECT 1 FROM departments WHERE dept_id=2',fetchone=True))
 
 if __name__ == '__main__':
     unittest.main()

@@ -11,7 +11,14 @@ from backend.resources import load_models
 from backend.session import refresh_session
 from backend.config import local_now,setting
 from backend.checkin import VoiceCheckinService
-from pages._ui import inject_css,brandbar,footer
+from ui.layout import inject_css,brandbar,footer
+from backend.errors import ValidationError,report_error
+
+def safe_login(auth,username,password):
+    try:
+        return auth.login(username,password)
+    except Exception as exc:
+        return {'status':False,'message':report_error('login',exc)}
 
 st.set_page_config(page_title='VBAS | Campus Intelligence',page_icon='◈',layout='wide',initial_sidebar_state='collapsed')
 inject_css()
@@ -19,18 +26,21 @@ brandbar()
 try:
     db=DatabaseHandler()
     ensure_admin(db)
-except ValueError as exc:
+except ValidationError as exc:
     st.error(str(exc))
     st.stop()
-except Exception:
-    logging.exception('Database startup failed')
-    st.error('The campus service is temporarily unavailable. Contact your administrator.')
+except Exception as exc:
+    st.error(report_error('hub-startup',exc))
     st.stop()
 auth=AuthHandler(db)
 attendance=AttendanceHandler(db)
 if 'user' not in st.session_state:
     st.session_state.user=None
-refresh_session(db)
+try:
+    refresh_session(db)
+except Exception as exc:
+    st.error(report_error("hub-session",exc))
+    st.stop()
 
 st.markdown("""<section class="hero"><div><div class="eyebrow">A smarter way to show up</div><h1>A campus in sync.<br><em>One voice at a time.</em></h1><p>Less time taking attendance. More time making progress. A connected workspace for students, educators, and the people who keep a university moving.</p><div class="tag-row"><span class="tag">Voice check-in</span><span class="tag">Role-based workspaces</span><span class="tag">Academic records</span></div></div><div class="hero-art" aria-label="Animated illustration of a voice waveform"><div class="orbit"></div><div class="orbit"></div><div class="voice-core"><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div><div class="art-label">VOICE → IDENTITY → PRESENCE</div><div class="float-note"><b>Your voice. Your presence.</b><small>Designed for supervised campus check-in</small></div></div></section>""",unsafe_allow_html=True)
 
@@ -74,7 +84,7 @@ with checkin_tab:
                 if verify.button('Verify & Mark Attendance',type='primary',use_container_width=True,disabled=audio is None):
                     try:
                         if time.monotonic()-st.session_state.get('last_voice_attempt',0)<3:
-                            raise ValueError('Wait a few seconds before another attempt.')
+                            raise ValidationError('Wait a few seconds before another attempt.')
                         st.session_state.last_voice_attempt=time.monotonic()
                         with st.spinner('Matching your voice securely...'):
                             processor,model=load_models()
@@ -86,11 +96,10 @@ with checkin_tab:
                             st.warning(result['message'])
                         else:
                             st.error(result['message'])
-                    except ValueError as exc:
+                    except ValidationError as exc:
                         st.error(str(exc))
-                    except Exception:
-                        logging.exception('Voice check-in failed')
-                        st.error('Voice matching is temporarily unavailable. Please contact a staff member.')
+                    except Exception as exc:
+                        st.error(report_error('voice-checkin',exc))
                 if clear.button('New recording',use_container_width=True):
                     st.session_state.voice_revision=st.session_state.get('voice_revision',0)+1
                     st.rerun()
@@ -109,11 +118,12 @@ with workspace_tab:
                 with st.form('login_form'):
                     username=st.text_input('Username',placeholder='Your university username')
                     password=st.text_input('Password',type='password',placeholder='Your password')
+                    st.caption('Press Enter or select Login to workspace to sign in.')
                     if st.form_submit_button('Login to workspace',type='primary',use_container_width=True):
                         if not username or not password:
                             st.error('Enter your username and password.')
                         else:
-                            result=auth.login(username,password)
+                            result=safe_login(auth,username,password)
                             if result['status']:
                                 st.session_state.user=result
                                 destinations={'chairman':'pages/chairman.py','teacher':'pages/teacher.py','faculty':'pages/Faculty.py','student':'pages/Student.py'}
@@ -123,7 +133,11 @@ with workspace_tab:
             else:
                 user=st.session_state.user
                 st.markdown(f'<div class="eyebrow">Your campus workspace</div><div class="section-title">Welcome, {escape(user["username"])}.</div><div class="section-sub">A focused space for your day on campus.</div><span class="role-badge">{escape(user["role"])}</span>',unsafe_allow_html=True)
-                records=attendance.get_user_attendance(user['user_id'])
+                try:
+                    records=attendance.get_user_attendance(user['user_id'])
+                except Exception as exc:
+                    st.error(report_error('hub-history',exc))
+                    st.stop()
                 if user['role']!='chairman':
                     a,b=st.columns(2)
                     a.metric('Recorded days',len(records))
